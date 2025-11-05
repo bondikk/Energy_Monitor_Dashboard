@@ -55,16 +55,21 @@ if __name__ == "__main__":
                 li.set_data(x, df["i"].values)
                 lp.set_data(x, df["p"].values)
 
-                # авто-масштаб
                 for ax, col in zip(axs, ["v", "i", "p"]):
-                    ax.relim(); ax.autoscale_view()
+                    ax.relim();
+                    ax.autoscale_view()
                     ax.grid(True, alpha=0.3)
 
                 fig.autofmt_xdate()
                 plt.tight_layout()
                 fig.canvas.draw()
                 fig.canvas.flush_events()
-            plt.pause(0.2)  # лёгкий «такт» обновления
+
+                # 🔽 вот сюда вставь автосохранение:
+                if len(WIN) % 60 == 0:  # каждые 500 точек (~8 мин)
+                    df.to_csv("log_auto.csv", mode="a", header=False)
+
+            plt.pause(0.2)
     except KeyboardInterrupt:
         out = make_df()
         if out is not None:

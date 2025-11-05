@@ -4,8 +4,32 @@
 #include "time.h"
 #include "secrets.h"
 
+#ifndef NTP_SERVER
+#define NTP_SERVER "pool.ntp.org"
+#endif
+
+#ifndef NTP_GMT_OFFSET
+#define NTP_GMT_OFFSET 0
+#endif
+
+#ifndef NTP_DAYLIGHT_OFFSET
+#define NTP_DAYLIGHT_OFFSET 0
+#endif
+
+#ifndef NTP_RESYNC_INTERVAL_MS
+#define NTP_RESYNC_INTERVAL_MS (6UL * 60UL * 60UL * 1000UL)
+#endif
+
+#ifndef NTP_RETRY_INTERVAL_MS
+#define NTP_RETRY_INTERVAL_MS (30UL * 1000UL)
+#endif
+
+
 WiFiClient esp;
 PubSubClient mqtt(esp);
+
+static unsigned long lastNtpAttemptMs = 0;
+static bool ntpSynced = false;
 
 // --- утилита для ISO времени (UTC) ---
 String iso8601() {
@@ -29,12 +53,39 @@ bool connectWiFi(unsigned long timeout_ms = 20000) {
   if (WiFi.status() == WL_CONNECTED) {
     Serial.print("\n[ OK ] WiFi connected, IP = ");
     Serial.println(WiFi.localIP());
+    ntpSynced = false;
+    lastNtpAttemptMs = 0;
     return true;
   } else {
     Serial.println("\n[ERR] WiFi timeout");
     return false;
   }
 }
+
+// --- синхронизация времени по NTP ---
+bool syncTimeFromNtp(uint32_t timeout_ms = 10000) {
+  Serial.print("[TIME] Sync via NTP (" NTP_SERVER ")...");
+  configTime(NTP_GMT_OFFSET, NTP_DAYLIGHT_OFFSET, NTP_SERVER);
+
+  struct tm ti;
+  if (getLocalTime(&ti, timeout_ms)) {
+    Serial.printf(" OK -> %04d-%02d-%02d %02d:%02d:%02d\n",
+                  ti.tm_year + 1900,
+                  ti.tm_mon + 1,
+                  ti.tm_mday,
+                  ti.tm_hour,
+                  ti.tm_min,
+                  ti.tm_sec);
+    ntpSynced = true;
+  } else {
+    Serial.println(" FAIL (timeout)");
+    ntpSynced = false;
+  }
+
+  lastNtpAttemptMs = millis();
+  return ntpSynced;
+}
+
 
 // --- MQTT с логами причин отказа ---
 void connectMQTT() {
@@ -65,18 +116,23 @@ void setup() {
   }
 
   Serial.println("[BOOT] NTP sync...");
-  configTime(0, 0, "pool.ntp.org");
-  // дадим времени подтянуться:
-  struct tm ti; int tries=0;
-  while (!getLocalTime(&ti) && tries < 10) { delay(300); Serial.print("."); tries++; }
-  Serial.println();
-
+   if (!syncTimeFromNtp()) {
+    Serial.println("[WARN] Initial NTP sync failed, will retry in background");
+  }
   connectMQTT();
 }
 
 void loop() {
   if (!mqtt.connected()) connectMQTT();
   mqtt.loop();
+
+  if (WiFi.status() == WL_CONNECTED) {
+    const unsigned long nowMs = millis();
+    const unsigned long interval = ntpSynced ? NTP_RESYNC_INTERVAL_MS : NTP_RETRY_INTERVAL_MS;
+    if (nowMs - lastNtpAttemptMs >= interval) {
+      syncTimeFromNtp(ntpSynced ? 2000 : 5000);
+    }
+  }
 
   static unsigned long t0 = 0;
   const unsigned long now = millis();
