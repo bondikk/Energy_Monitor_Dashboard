@@ -8,7 +8,7 @@
 
 This repository combines two parts of an experimental **Non-Intrusive Load Monitoring (NILM)** system:
 
-1. **ESP32 Firmware** — generates synthetic energy data, synchronizes time via NTP, and publishes telemetry to MQTT.
+1. **ESP32 Firmware** — reads an **ADS1256** ADC (voltage + shunt current), synchronizes time via NTP, and publishes telemetry to MQTT.
 2. **Python Host Application** — subscribes to MQTT topics, visualizes live data, and saves measurements to CSV.
 
 Together they form a minimal testbed for NILM algorithm development without using real sensors.
@@ -105,10 +105,9 @@ firmware/
 3. Select **Board → ESP32 Dev Module** and the correct **COM/tty port**.
 4. Upload the firmware.
 
-In the Serial Monitor you should see logs showing Wi-Fi, NTP, and MQTT connection steps, followed by published JSON messages.
+In the Serial Monitor you should see logs showing Wi-Fi, NTP, MQTT, and ADS1256 initialization steps, followed by published JSON messages.
 
-The firmware generates sinusoidal voltage/current profiles with small “load events,” synchronizes time via NTP, and publishes one data packet per second.
-If Wi-Fi or MQTT disconnects, the ESP32 automatically retries.
+The firmware now reads **ADS1256** channels `AIN0` (voltage divider) and `AIN1` (shunt current) every second, performs simple averaging, and publishes one data packet per second.
 
 ---
 
@@ -123,7 +122,9 @@ Example MQTT payload:
   "v_rms": 229.7,
   "i_rms": 0.34,
   "p_active": 78.1,
-  "sample_rate": 15000
+  "sample_rate": 15000,
+  "raw_adc_v": 0.231,
+  "raw_adc_i": 0.012
 }
 ```
 
@@ -134,7 +135,9 @@ Example MQTT payload:
 | `v_rms`       | RMS voltage in volts.                                     |
 | `i_rms`       | RMS current in amperes.                                   |
 | `p_active`    | Active power in watts.                                    |
-| `sample_rate` | Sampling rate of the simulator (Hz).                      |
+| `sample_rate` | Sampling rate configured for the ADC (Hz).                |
+| `raw_adc_v`   | Raw ADC voltage (after divider) in volts.                 |
+| `raw_adc_i`   | Raw ADC shunt drop in volts.                              |
 
 The Python host keeps the latest **600 points** in a circular buffer (~10 min at 1 Hz), updates live plots, and writes logs automatically.
 
@@ -145,8 +148,7 @@ The Python host keeps the latest **600 points** in a circular buffer (~10 min at
 * Adjust the buffer window size in `mqtt_listener.py` (`deque(maxlen=600)`).
 * To save every packet, remove the condition `len(WIN) % 60 == 0`.
 * Subscribe to multiple devices via `nilm/+/telemetry` and use the `device` column for filtering.
-* Replace the simulation block in the firmware with real sensor readings (e.g., **ADE7953**, **PZEM-004T**, **SCT-013**) while keeping the same JSON format.
-
+* ESP32 firmware already targets **ADS1256**: tune `VOLTAGE_DIVIDER_RATIO`, `SHUNT_RESISTOR_OHMS`, and the DRDY/CS pins inside `firmware/esp32_nilm_sim/esp32_nilm_sim.ino` to match your wiring.
 ---
 
 ## Useful Links
