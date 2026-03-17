@@ -1,0 +1,40 @@
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI
+
+from app.init_db import init_db
+from app.mqtt_listener import start_mqtt_listener
+from app.routes.auth_routes import router as auth_router
+from app.routes.measurement_routes import router as measurement_router
+from app.routes.device_routes import router as device_router
+from app.routes.stats_routes import router as stats_router
+
+mqtt_client = None
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    global mqtt_client
+    init_db()
+    mqtt_client = start_mqtt_listener()
+    yield
+    if mqtt_client is not None:
+        mqtt_client.loop_stop()
+        mqtt_client.disconnect()
+
+
+app = FastAPI(
+    title="NILM Backend API",
+    version="0.1.0",
+    lifespan=lifespan
+)
+
+app.include_router(auth_router)
+app.include_router(measurement_router)
+app.include_router(device_router)
+app.include_router(stats_router)
+
+
+@app.get("/")
+def root():
+    return {"message": "NILM backend is running"}

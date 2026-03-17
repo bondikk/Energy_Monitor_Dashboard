@@ -1,0 +1,12 @@
+paho-mqtt
+pandas
+matplotlib
+fastapi
+uvicorn
+sqlalchemy
+pydantic
+paho-mqtt
+python-jose
+passlib[bcrypt]
+email-validator
+python-multipart

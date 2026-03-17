@@ -74,7 +74,7 @@ firmware/
 4. Run the host:
 
    ```bash
-   python host/mqtt_listener.py
+   python data/mqtt_listener.py
    ```
 5. Once telemetry starts arriving, a live window will appear showing three plots:
    voltage, current, and active power. Every 60 samples are auto-appended to
