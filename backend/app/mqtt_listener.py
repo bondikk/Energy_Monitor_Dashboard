@@ -3,10 +3,10 @@ from datetime import datetime
 
 import paho.mqtt.client as mqtt
 
-from app.config import MQTT_BROKER, MQTT_PORT, MQTT_TOPIC_MEASUREMENTS, MQTT_CLIENT_ID
-from app.database import SessionLocal
-from app.schemas import MeasurementCreate
-from app.crud import create_measurement
+from .config import MQTT_BROKER, MQTT_PORT, MQTT_TOPIC_MEASUREMENTS, MQTT_CLIENT_ID
+from .database import SessionLocal
+from .schemas import MeasurementCreate
+from .crud import create_measurement
 
 
 def parse_timestamp(value):
@@ -35,11 +35,11 @@ def on_message(client, userdata, msg):
         payload = json.loads(raw)
 
         measurement = MeasurementCreate(
-            device_id=payload.get("device_id", "esp32-01"),
+            device_id=payload.get("device_id") or payload.get("device") or "esp32-01",
             timestamp=parse_timestamp(payload.get("timestamp")),
-            current=payload.get("current"),
+            current=payload.get("current") if payload.get("current") is not None else payload.get("i_rms"),
             voltage=payload.get("voltage"),
-            power=payload.get("power"),
+            power=payload.get("power") if payload.get("power") is not None else payload.get("s_est_va"),
             channel=payload.get("channel")
         )
 

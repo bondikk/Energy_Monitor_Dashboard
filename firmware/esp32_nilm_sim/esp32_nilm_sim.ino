@@ -50,7 +50,7 @@ void loop() {
 
     Serial.print("[MEAS] i_rms = ");
     Serial.print(i_rms, 6);
-    Serial.print(" A | s_est = ");
+    Serial.print(" A | power = ");
     Serial.print(s_est, 2);
     Serial.println(" VA");
 
