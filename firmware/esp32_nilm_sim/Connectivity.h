@@ -16,7 +16,7 @@ public:
   bool isMQTTConnected() ;
 
   String iso8601();
-  bool publishCurrent(float iRms, float sEstVA);
+  bool publishTelemetry(float iRms, float vRms, float sEstVA);
 
 private:
   WiFiClient _espClient;

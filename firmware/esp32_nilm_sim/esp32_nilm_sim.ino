@@ -46,14 +46,22 @@ void loop() {
     tPub = now;
 
     float i_rms = currentSensor.readCurrentRMS(RMS_SAMPLES);
-    float s_est = PowerMetrics::apparentPower(MAINS_V_RMS_EST, i_rms);
 
-    Serial.print("[MEAS] i_rms = ");
-    Serial.print(i_rms, 6);
-    Serial.print(" A | power = ");
-    Serial.print(s_est, 2);
-    Serial.println(" VA");
+float v_rms = voltageSensor.readVoltageRMS(RMS_SAMPLES);
+if (v_rms <= 1.0f) {
+  v_rms = MAINS_V_RMS_EST;   // временный fallback, пока VoltageSensor = заглушка
+}
 
-    conn.publishCurrent(i_rms, s_est);
+float s_est = PowerMetrics::apparentPower(v_rms, i_rms);
+
+Serial.print("[MEAS] i_rms = ");
+Serial.print(i_rms, 6);
+Serial.print(" A | v_rms = ");
+Serial.print(v_rms, 2);
+Serial.print(" V | power = ");
+Serial.print(s_est, 2);
+Serial.println(" VA");
+
+conn.publishTelemetry(i_rms, v_rms, s_est);
   }
 }

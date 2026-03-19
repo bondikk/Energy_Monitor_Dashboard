@@ -118,7 +118,7 @@ String Connectivity::iso8601() {
   return String(buf);
 }
 
-bool Connectivity::publishCurrent(float iRms, float sEstVA) {
+bbool Connectivity::publishTelemetry(float iRms, float vRms, float sEstVA) {
   if (!isWiFiConnected() || !isMQTTConnected()) {
     return false;
   }
@@ -132,10 +132,12 @@ bool Connectivity::publishCurrent(float iRms, float sEstVA) {
   }
 
   doc["i_rms"] = roundf(iRms * 1000.0f) / 1000.0f;
+  doc["voltage_rms"] = roundf(vRms * 100.0f) / 100.0f;
   doc["s_est_va"] = roundf(sEstVA * 10.0f) / 10.0f;
   doc["adc_sample_sps"] = ADS_SPS;
-  doc["channel"] = "AIN0-AIN1";
-  doc["note"] = "current-only measurement";
+  doc["channel_current"] = "AIN0-AIN1";
+  doc["channel_voltage"] = "TBD";
+  doc["note"] = "current + voltage telemetry";
 
   char payload[256];
   serializeJson(doc, payload);
@@ -149,4 +151,4 @@ bool Connectivity::publishCurrent(float iRms, float sEstVA) {
   }
 
   return ok;
-}
+}}
