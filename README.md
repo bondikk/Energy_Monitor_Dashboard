@@ -4,7 +4,7 @@
 
 This repository contains three implemented parts of a small NILM-oriented telemetry stack:
 
-## 1. **A FastAPI backend** that stores energy measurements in SQLite and exposes HTTP endpoints for authentication, device discovery, measurement history, and dashboard statistics.
+ 1. **A FastAPI backend** that stores energy measurements in SQLite and exposes HTTP endpoints for authentication, device discovery, measurement history, and dashboard statistics.
 2. **A minimal React frontend source tree** that polls the backend for the latest measurement and renders a simple dashboard.
 3. **ESP32 firmware** for an `ESP32 + ADS1256` setup that reads current data, estimates voltage/apparent power, and publishes telemetry over MQTT.
 
