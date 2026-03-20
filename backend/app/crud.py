@@ -102,13 +102,19 @@ def create_measurement(db: Session, payload: schemas.MeasurementCreate) -> model
 
 
 def get_latest_measurement(db: Session, device_id: Optional[str] = None) -> Optional[models.Measurement]:
-    query = db.query(models.Measurement).join(models.Device)
-
     if device_id:
-        query = query.filter(models.Device.device_id == device_id)
+        device = get_device_by_device_id(db, device_id)
+        if not device:
+            return None
 
-    return query.order_by(desc(models.Measurement.timestamp)).first()
+        return (
+            db.query(models.Measurement)
+            .filter(models.Measurement.device_ref_id == device.id)
+            .order_by(desc(models.Measurement.id))
+            .first()
+        )
 
+    return db.query(models.Measurement).order_by(desc(models.Measurement.id)).first()
 
 def get_measurements_history(db: Session, device_id: Optional[str] = None, limit: int = 100):
     query = db.query(models.Measurement, models.Device).join(models.Device)

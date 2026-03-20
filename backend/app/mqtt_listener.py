@@ -38,21 +38,22 @@ def on_message(client, userdata, msg):
             device_id=payload.get("device_id") or payload.get("device") or "esp32-01",
             timestamp=parse_timestamp(payload.get("timestamp")),
             current=payload.get("current") if payload.get("current") is not None else payload.get("i_rms"),
-            voltage=payload.get("voltage"),
+            voltage=payload.get("voltage") if payload.get("voltage") is not None else payload.get("voltage_rms"),
             power=payload.get("power") if payload.get("power") is not None else payload.get("s_est_va"),
-            channel=payload.get("channel")
+            channel=payload.get("channel") or payload.get("channel_current")
         )
+
+        print(f"[MQTT] Parsed measurement: {measurement}")
 
         db = SessionLocal()
         try:
-            create_measurement(db, measurement)
-            print("[MQTT] Measurement saved to DB")
+            saved = create_measurement(db, measurement)
+            print(f"[MQTT] Measurement saved to DB: id={saved.id}, device_ref_id={saved.device_ref_id}")
         finally:
             db.close()
 
     except Exception as e:
         print(f"[MQTT] Error processing message: {e}")
-
 
 def start_mqtt_listener():
     client = mqtt.Client(client_id=MQTT_CLIENT_ID)
