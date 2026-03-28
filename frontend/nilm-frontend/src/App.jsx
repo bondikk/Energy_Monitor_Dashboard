@@ -12,6 +12,25 @@ import {
 
 const API_BASE = "http://127.0.0.1:8001";
 
+function formatNumber(value, digits = 2) {
+  if (value === null || value === undefined) return "-";
+  return Number(value).toFixed(digits);
+}
+
+function formatDateTime(value) {
+  if (!value) return "-";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return value;
+  return d.toLocaleString();
+}
+
+function formatTime(value) {
+  if (!value) return "-";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return value;
+  return d.toLocaleTimeString();
+}
+
 function MetricCard({ title, value, unit }) {
   return (
     <div
@@ -19,7 +38,8 @@ function MetricCard({ title, value, unit }) {
         border: "1px solid #e5e7eb",
         borderRadius: 16,
         padding: 20,
-        minWidth: 180,
+        minWidth: 220,
+        flex: "1 1 220px",
         background: "#ffffff",
         boxShadow: "0 4px 16px rgba(0,0,0,0.05)",
       }}
@@ -28,8 +48,7 @@ function MetricCard({ title, value, unit }) {
         {title}
       </div>
       <div style={{ fontSize: 32, fontWeight: 700, color: "#111827" }}>
-        {value ?? "-"}{" "}
-        <span style={{ fontSize: 18, fontWeight: 500 }}>{unit}</span>
+        {value} <span style={{ fontSize: 18, fontWeight: 500 }}>{unit}</span>
       </div>
     </div>
   );
@@ -75,11 +94,31 @@ function exportHistoryToCSV(history) {
   URL.revokeObjectURL(url);
 }
 
+const thStyle = {
+  textAlign: "left",
+  padding: "14px 12px",
+  borderBottom: "1px solid #e5e7eb",
+  color: "#374151",
+  fontSize: 14,
+};
+
+const tdStyle = {
+  padding: "14px 12px",
+  borderBottom: "1px solid #f3f4f6",
+  color: "#111827",
+  fontSize: 14,
+};
+
 export default function App() {
   const [data, setData] = useState(null);
   const [history, setHistory] = useState([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+
+  const [historyLimit, setHistoryLimit] = useState(50);
+  const [chartMetric, setChartMetric] = useState("power");
+  const [backendOnline, setBackendOnline] = useState(false);
+  const [lastUpdate, setLastUpdate] = useState("");
 
   async function load() {
     try {
@@ -88,17 +127,20 @@ export default function App() {
         throw new Error(`Latest API error: ${latestRes.status}`);
       }
       const latest = await latestRes.json();
-      setData(latest);
 
-      const historyRes = await fetch(`${API_BASE}/measurements/history?limit=50`);
+      const historyRes = await fetch(`${API_BASE}/measurements/history?limit=${historyLimit}`);
       if (!historyRes.ok) {
         throw new Error(`History API error: ${historyRes.status}`);
       }
       const historyJson = await historyRes.json();
-      setHistory(historyJson.items ?? []);
 
+      setData(latest);
+      setHistory(historyJson.items ?? []);
+      setBackendOnline(true);
+      setLastUpdate(new Date().toLocaleTimeString());
       setError("");
     } catch (e) {
+      setBackendOnline(false);
       setError(`Не удалось получить данные с backend: ${e.message}`);
     } finally {
       setLoading(false);
@@ -109,16 +151,36 @@ export default function App() {
     load();
     const id = setInterval(load, 2000);
     return () => clearInterval(id);
-  }, []);
+  }, [historyLimit]);
 
   const chartData = useMemo(() => {
     return [...history]
       .reverse()
       .map((item) => ({
         ...item,
-        time: new Date(item.timestamp).toLocaleTimeString(),
+        time: formatTime(item.timestamp),
       }));
   }, [history]);
+
+  const chartConfig = {
+    power: {
+      dataKey: "power",
+      label: "Apparent Power (S)",
+      unit: "VA",
+    },
+    current: {
+      dataKey: "current",
+      label: "Current RMS",
+      unit: "A",
+    },
+    voltage: {
+      dataKey: "voltage",
+      label: "Voltage RMS",
+      unit: "V",
+    },
+  };
+
+  const currentChart = chartConfig[chartMetric];
 
   return (
     <div
@@ -138,7 +200,43 @@ export default function App() {
           Live telemetry from ESP32 + ADS1256
         </p>
 
-        {loading && <p>Загрузка...</p>}
+        <div
+          style={{
+            marginTop: 16,
+            display: "flex",
+            gap: 12,
+            flexWrap: "wrap",
+            alignItems: "center",
+          }}
+        >
+          <div
+            style={{
+              padding: "8px 12px",
+              borderRadius: 999,
+              background: backendOnline ? "#dcfce7" : "#fee2e2",
+              color: backendOnline ? "#166534" : "#991b1b",
+              fontWeight: 600,
+              fontSize: 14,
+            }}
+          >
+            Backend: {backendOnline ? "Online" : "Offline"}
+          </div>
+
+          <div
+            style={{
+              padding: "8px 12px",
+              borderRadius: 999,
+              background: "#ffffff",
+              border: "1px solid #e5e7eb",
+              color: "#374151",
+              fontSize: 14,
+            }}
+          >
+            Last update: {lastUpdate || "-"}
+          </div>
+        </div>
+
+        {loading && <p style={{ marginTop: 16 }}>Загрузка...</p>}
 
         {error && (
           <div
@@ -164,9 +262,21 @@ export default function App() {
                 marginTop: 28,
               }}
             >
-              <MetricCard title="Current" value={data.current} unit="A" />
-              <MetricCard title="Voltage" value={data.voltage} unit="V" />
-              <MetricCard title="Apparent Power" value={data.power} unit="VA" />
+              <MetricCard
+                title="Current RMS"
+                value={formatNumber(data.current)}
+                unit="A"
+              />
+              <MetricCard
+                title="Voltage RMS"
+                value={formatNumber(data.voltage)}
+                unit="V"
+              />
+              <MetricCard
+                title="Apparent Power (S)"
+                value={formatNumber(data.power)}
+                unit="VA"
+              />
             </div>
 
             <div
@@ -180,11 +290,21 @@ export default function App() {
               }}
             >
               <h2 style={{ marginTop: 0, color: "#111827" }}>Telemetry Info</h2>
-              <p><strong>Measurement ID:</strong> {data.id ?? "-"}</p>
-              <p><strong>Device ID:</strong> {data.device_id ?? "-"}</p>
-              <p><strong>Device Name:</strong> {data.device_name ?? "-"}</p>
-              <p><strong>Timestamp:</strong> {data.timestamp ?? "-"}</p>
-              <p><strong>Channel:</strong> {data.channel ?? "-"}</p>
+
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+                  gap: 16,
+                  marginTop: 16,
+                }}
+              >
+                <div><strong>Measurement ID:</strong> {data.id ?? "-"}</div>
+                <div><strong>Device ID:</strong> {data.device_id ?? "-"}</div>
+                <div><strong>Device Name:</strong> {data.device_name ?? "-"}</div>
+                <div><strong>Timestamp:</strong> {formatDateTime(data.timestamp)}</div>
+                <div><strong>Channel:</strong> {data.channel ?? "-"}</div>
+              </div>
             </div>
           </>
         )}
@@ -206,27 +326,38 @@ export default function App() {
               alignItems: "center",
               gap: 16,
               flexWrap: "wrap",
+              marginBottom: 16,
             }}
           >
-            <h2 style={{ marginTop: 0, marginBottom: 16, color: "#111827" }}>
-              Power History
-            </h2>
+            <h2 style={{ margin: 0, color: "#111827" }}>History Chart</h2>
 
-            <button
-              onClick={() => exportHistoryToCSV(history)}
-              style={{
-                border: "none",
-                background: "#111827",
-                color: "#ffffff",
-                padding: "10px 16px",
-                borderRadius: 10,
-                cursor: "pointer",
-                fontSize: 14,
-                fontWeight: 600,
-              }}
-            >
-              Export CSV
-            </button>
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+              <button onClick={() => setChartMetric("power")} style={buttonStyle(chartMetric === "power")}>
+                Power
+              </button>
+              <button onClick={() => setChartMetric("current")} style={buttonStyle(chartMetric === "current")}>
+                Current
+              </button>
+              <button onClick={() => setChartMetric("voltage")} style={buttonStyle(chartMetric === "voltage")}>
+                Voltage
+              </button>
+
+              <button
+                onClick={() => exportHistoryToCSV(history)}
+                style={{
+                  border: "none",
+                  background: "#111827",
+                  color: "#ffffff",
+                  padding: "10px 16px",
+                  borderRadius: 10,
+                  cursor: "pointer",
+                  fontSize: 14,
+                  fontWeight: 600,
+                }}
+              >
+                Export CSV
+              </button>
+            </div>
           </div>
 
           {chartData.length === 0 ? (
@@ -242,8 +373,8 @@ export default function App() {
                   <Legend />
                   <Line
                     type="monotone"
-                    dataKey="power"
-                    name="Power (VA)"
+                    dataKey={currentChart.dataKey}
+                    name={`${currentChart.label} (${currentChart.unit})`}
                     stroke="#111827"
                     strokeWidth={2}
                     dot={false}
@@ -264,7 +395,29 @@ export default function App() {
             boxShadow: "0 4px 16px rgba(0,0,0,0.05)",
           }}
         >
-          <h2 style={{ marginTop: 0, color: "#111827" }}>Measurement History</h2>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              gap: 16,
+              flexWrap: "wrap",
+            }}
+          >
+            <h2 style={{ marginTop: 0, color: "#111827" }}>Measurement History</h2>
+
+            <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={() => setHistoryLimit(20)} style={smallButtonStyle(historyLimit === 20)}>
+                20
+              </button>
+              <button onClick={() => setHistoryLimit(50)} style={smallButtonStyle(historyLimit === 50)}>
+                50
+              </button>
+              <button onClick={() => setHistoryLimit(100)} style={smallButtonStyle(historyLimit === 100)}>
+                100
+              </button>
+            </div>
+          </div>
 
           {history.length === 0 ? (
             <p style={{ color: "#6b7280" }}>Нет данных истории.</p>
@@ -292,11 +445,11 @@ export default function App() {
                   {history.map((item) => (
                     <tr key={item.id}>
                       <td style={tdStyle}>{item.id}</td>
-                      <td style={tdStyle}>{item.timestamp}</td>
+                      <td style={tdStyle}>{formatDateTime(item.timestamp)}</td>
                       <td style={tdStyle}>{item.device_id}</td>
-                      <td style={tdStyle}>{item.current}</td>
-                      <td style={tdStyle}>{item.voltage}</td>
-                      <td style={tdStyle}>{item.power}</td>
+                      <td style={tdStyle}>{formatNumber(item.current)}</td>
+                      <td style={tdStyle}>{formatNumber(item.voltage)}</td>
+                      <td style={tdStyle}>{formatNumber(item.power)}</td>
                       <td style={tdStyle}>{item.channel ?? "-"}</td>
                     </tr>
                   ))}
@@ -310,17 +463,28 @@ export default function App() {
   );
 }
 
-const thStyle = {
-  textAlign: "left",
-  padding: "12px 10px",
-  borderBottom: "1px solid #e5e7eb",
-  color: "#374151",
-  fontSize: 14,
-};
+function buttonStyle(active) {
+  return {
+    border: active ? "none" : "1px solid #d1d5db",
+    background: active ? "#111827" : "#ffffff",
+    color: active ? "#ffffff" : "#111827",
+    padding: "10px 14px",
+    borderRadius: 10,
+    cursor: "pointer",
+    fontSize: 14,
+    fontWeight: 600,
+  };
+}
 
-const tdStyle = {
-  padding: "12px 10px",
-  borderBottom: "1px solid #f3f4f6",
-  color: "#111827",
-  fontSize: 14,
-};
+function smallButtonStyle(active) {
+  return {
+    border: active ? "none" : "1px solid #d1d5db",
+    background: active ? "#111827" : "#ffffff",
+    color: active ? "#ffffff" : "#111827",
+    padding: "8px 12px",
+    borderRadius: 8,
+    cursor: "pointer",
+    fontSize: 13,
+    fontWeight: 600,
+  };
+}
