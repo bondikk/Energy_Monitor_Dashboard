@@ -9,6 +9,9 @@ import {
   CartesianGrid,
   Legend,
 } from "recharts";
+import AuthPage from "./AuthPage";
+import { clearToken, getToken } from "./api";
+import feiLogo from "./assets/fei-stu-logo.png";
 
 const API_BASE = "http://127.0.0.1:8001";
 
@@ -80,7 +83,9 @@ function exportHistoryToCSV(history) {
   ]);
 
   const csv = [header, ...rows]
-    .map((row) => row.map((value) => `"${String(value).replace(/"/g, '""')}"`).join(","))
+    .map((row) =>
+      row.map((value) => `"${String(value).replace(/"/g, '""')}"`).join(",")
+    )
     .join("\n");
 
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
@@ -109,7 +114,35 @@ const tdStyle = {
   fontSize: 14,
 };
 
+function buttonStyle(active) {
+  return {
+    border: active ? "none" : "1px solid #d1d5db",
+    background: active ? "#111827" : "#ffffff",
+    color: active ? "#ffffff" : "#111827",
+    padding: "10px 14px",
+    borderRadius: 10,
+    cursor: "pointer",
+    fontSize: 14,
+    fontWeight: 600,
+  };
+}
+
+function smallButtonStyle(active) {
+  return {
+    border: active ? "none" : "1px solid #d1d5db",
+    background: active ? "#111827" : "#ffffff",
+    color: active ? "#ffffff" : "#111827",
+    padding: "8px 12px",
+    borderRadius: 8,
+    cursor: "pointer",
+    fontSize: 13,
+    fontWeight: 600,
+  };
+}
+
 export default function App() {
+  const [isAuthenticated, setIsAuthenticated] = useState(!!getToken());
+
   const [data, setData] = useState(null);
   const [history, setHistory] = useState([]);
   const [error, setError] = useState("");
@@ -128,7 +161,9 @@ export default function App() {
       }
       const latest = await latestRes.json();
 
-      const historyRes = await fetch(`${API_BASE}/measurements/history?limit=${historyLimit}`);
+      const historyRes = await fetch(
+        `${API_BASE}/measurements/history?limit=${historyLimit}`
+      );
       if (!historyRes.ok) {
         throw new Error(`History API error: ${historyRes.status}`);
       }
@@ -141,25 +176,25 @@ export default function App() {
       setError("");
     } catch (e) {
       setBackendOnline(false);
-      setError(`Не удалось получить данные с backend: ${e.message}`);
+      setError(`Failed to load data from backend: ${e.message}`);
     } finally {
       setLoading(false);
     }
   }
 
   useEffect(() => {
+    if (!isAuthenticated) return;
+
     load();
     const id = setInterval(load, 2000);
     return () => clearInterval(id);
-  }, [historyLimit]);
+  }, [historyLimit, isAuthenticated]);
 
   const chartData = useMemo(() => {
-    return [...history]
-      .reverse()
-      .map((item) => ({
-        ...item,
-        time: formatTime(item.timestamp),
-      }));
+    return [...history].reverse().map((item) => ({
+      ...item,
+      time: formatTime(item.timestamp),
+    }));
   }, [history]);
 
   const chartConfig = {
@@ -182,6 +217,15 @@ export default function App() {
 
   const currentChart = chartConfig[chartMetric];
 
+  function handleLogout() {
+    clearToken();
+    setIsAuthenticated(false);
+  }
+
+  if (!isAuthenticated) {
+    return <AuthPage onLoginSuccess={() => setIsAuthenticated(true)} />;
+  }
+
   return (
     <div
       style={{
@@ -192,17 +236,83 @@ export default function App() {
       }}
     >
       <div style={{ maxWidth: 1200, margin: "0 auto" }}>
-        <h1 style={{ margin: 0, fontSize: 36, color: "#111827" }}>
-          NILM Dashboard
-        </h1>
+        <div
+          style={{
+            background: "#1639a5",
+            color: "#ffffff",
+            borderRadius: 20,
+            padding: "20px 24px",
+            boxShadow: "0 10px 24px rgba(0,0,0,0.12)",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: 20,
+            flexWrap: "wrap",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 18,
+              flexWrap: "wrap",
+            }}
+          >
+            <img
+              src={feiLogo}
+              alt="FEI STU"
+              style={{
+                height: 64,
+                width: "auto",
+                borderRadius: 8,
+                padding: 4,
+              }}
+            />
 
-        <p style={{ color: "#6b7280", marginTop: 8 }}>
-          Live telemetry from ESP32 + ADS1256
-        </p>
+            <div>
+              <h1
+                style={{
+                  margin: 0,
+                  fontSize: 34,
+                  color: "#ffffff",
+                }}
+              >
+                Power Measurement Dashboard
+              </h1>
+
+              <p
+                style={{
+                  marginTop: 8,
+                  marginBottom: 0,
+                  color: "rgba(255,255,255,0.88)",
+                  fontSize: 15,
+                }}
+              >
+                Live current, voltage and power measurements from ESP32 + ADS1256
+              </p>
+            </div>
+          </div>
+
+          <button
+            onClick={handleLogout}
+            style={{
+              border: "1px solid rgba(255,255,255,0.25)",
+              background: "#ffffff",
+              color: "#1e40af",
+              padding: "10px 16px",
+              borderRadius: 12,
+              cursor: "pointer",
+              fontSize: 14,
+              fontWeight: 700,
+            }}
+          >
+            Logout
+          </button>
+        </div>
 
         <div
           style={{
-            marginTop: 16,
+            marginTop: 18,
             display: "flex",
             gap: 12,
             flexWrap: "wrap",
@@ -332,13 +442,22 @@ export default function App() {
             <h2 style={{ margin: 0, color: "#111827" }}>History Chart</h2>
 
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-              <button onClick={() => setChartMetric("power")} style={buttonStyle(chartMetric === "power")}>
+              <button
+                onClick={() => setChartMetric("power")}
+                style={buttonStyle(chartMetric === "power")}
+              >
                 Power
               </button>
-              <button onClick={() => setChartMetric("current")} style={buttonStyle(chartMetric === "current")}>
+              <button
+                onClick={() => setChartMetric("current")}
+                style={buttonStyle(chartMetric === "current")}
+              >
                 Current
               </button>
-              <button onClick={() => setChartMetric("voltage")} style={buttonStyle(chartMetric === "voltage")}>
+              <button
+                onClick={() => setChartMetric("voltage")}
+                style={buttonStyle(chartMetric === "voltage")}
+              >
                 Voltage
               </button>
 
@@ -461,30 +580,4 @@ export default function App() {
       </div>
     </div>
   );
-}
-
-function buttonStyle(active) {
-  return {
-    border: active ? "none" : "1px solid #d1d5db",
-    background: active ? "#111827" : "#ffffff",
-    color: active ? "#ffffff" : "#111827",
-    padding: "10px 14px",
-    borderRadius: 10,
-    cursor: "pointer",
-    fontSize: 14,
-    fontWeight: 600,
-  };
-}
-
-function smallButtonStyle(active) {
-  return {
-    border: active ? "none" : "1px solid #d1d5db",
-    background: active ? "#111827" : "#ffffff",
-    color: active ? "#ffffff" : "#111827",
-    padding: "8px 12px",
-    borderRadius: 8,
-    cursor: "pointer",
-    fontSize: 13,
-    fontWeight: 600,
-  };
 }
