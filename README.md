@@ -522,43 +522,6 @@ The firmware publishes once every second, using values derived from:
 
 For a software-only check, skip the ESP32 and publish JSON manually to the MQTT topic.
 
-## Limitations based on current implementation
-
-These limitations are directly visible in the codebase:
-
-1. **No actual NILM/disaggregation logic is implemented.** The code stores and displays telemetry, but does not identify appliances or run energy inference models.
-2. **Frontend build files are missing.** The source tree exists, but `package.json` and related tooling files are not versioned.
-3. **Frontend code is partially inconsistent.** `App.jsx` and `components/Dashboard.jsx` expect different API payload shapes.
-4. **Backend configuration is hard-coded.** There is no environment-variable-based configuration layer.
-5. **JWT configuration is duplicated/inconsistent.** `backend/app/config.py` defines JWT settings, but `backend/app/auth.py` uses its own hard-coded `SECRET_KEY`, `ALGORITHM`, and expiration values.
-6. **No authorization enforcement is implemented on API routes.** Login issues tokens, but protected endpoints are not present.
-7. **Only one MQTT topic is subscribed by default.** Multi-device scaling would require config changes or wildcard topic support.
-8. **Device offline detection is not implemented.** Devices become `online` on message receipt, but there is no background timeout that switches them back to `offline`.
-9. **Voltage measurement is not implemented in firmware.** `VoltageSensor::readVoltageRMS()` returns `0.0f`, so the firmware uses a fixed fallback voltage.
-10. **Firmware appears to contain a compile-time typo.** `Connectivity.cpp` declares `bbool Connectivity::publishTelemetry(...)` instead of `bool`.
-11. **Sensitive data is committed in firmware config.** `secrets.h` contains real-looking Wi-Fi/MQTT values rather than placeholders.
-12. **Service modules are placeholders.** `backend/app/services/measurement_service.py` and `stats_service.py` are empty.
-13. **Database migrations are not implemented.** Schema creation uses `Base.metadata.create_all()` only.
-14. **CORS is limited to localhost frontend origins.** This is fine for development, but not production-ready by itself.
-
-## Possible next steps based on the codebase
-Reasonable next steps supported by the current structure would be:
-
-1. **Add environment-variable configuration** for DB path, MQTT broker/topic, JWT secret, and CORS origins.
-2. **Restore the frontend manifest** (`package.json`, build config, scripts) so the UI is reproducible.
-3. **Unify frontend/backend response contracts** and remove the unused divergent dashboard component.
-4. **Fix the firmware compile typo** in `Connectivity.cpp`.
-5. **Implement real voltage sampling** in `VoltageSensor` instead of using a fixed fallback.
-6. **Add protected API routes** that actually validate bearer tokens.
-7. **Add offline status logic** based on `last_seen` thresholds.
-8. **Support multiple MQTT topics/devices** through configuration or topic wildcards.
-9. **Introduce database migrations** (for example via Alembic) if the schema will evolve.
-10. **Move secrets out of source control** and provide example config templates.
-11. **Populate the empty service modules** or remove them if unnecessary.
-12. **Add automated tests** for MQTT parsing, CRUD functions, and API routes.
-13. **Add historical charts to the frontend** using `/measurements/history` and `/stats/dashboard`.
-14. **Implement actual NILM analysis modules** if appliance-level inference is a planned goal.v
-
 ## License
 No license file is present in the repository at the time of writing.
 
