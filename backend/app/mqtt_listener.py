@@ -1,4 +1,5 @@
 import json
+import logging
 from datetime import datetime
 
 import paho.mqtt.client as mqtt
@@ -7,6 +8,14 @@ from .config import MQTT_BROKER, MQTT_PORT, MQTT_TOPIC_MEASUREMENTS, MQTT_CLIENT
 from .database import SessionLocal
 from .schemas import MeasurementCreate
 from .crud import create_measurement
+
+logger = logging.getLogger(__name__)
+
+mqtt_status = "offline"
+
+
+def get_mqtt_status() -> str:
+    return mqtt_status
 
 
 def parse_timestamp(value):
@@ -22,14 +31,27 @@ def parse_timestamp(value):
 
 
 def on_connect(client, userdata, flags, rc):
-    print(f"[MQTT] Connected with result code {rc}")
-    client.subscribe(MQTT_TOPIC_MEASUREMENTS)
-    print(f"[MQTT] Subscribed to: {MQTT_TOPIC_MEASUREMENTS}")
+    global mqtt_status
+    if rc == 0:
+        mqtt_status = "connected"
+        logger.info("[MQTT] Connected")
+        client.subscribe(MQTT_TOPIC_MEASUREMENTS)
+        logger.info("[MQTT] Subscribed to: %s", MQTT_TOPIC_MEASUREMENTS)
+    else:
+        mqtt_status = "offline"
+        logger.warning("[MQTT] Connect failed rc=%s", rc)
+
+
+def on_disconnect(client, userdata, rc):
+    global mqtt_status
+    mqtt_status = "offline"
+    if rc != 0:
+        logger.warning("[MQTT] Unexpected disconnect rc=%s", rc)
 
 
 def on_message(client, userdata, msg):
     raw = msg.payload.decode("utf-8")
-    print(f"[MQTT] Received: {raw}")
+    logger.info("[MQTT] Received: %s", raw)
 
     try:
         payload = json.loads(raw)
@@ -37,31 +59,44 @@ def on_message(client, userdata, msg):
         measurement = MeasurementCreate(
             device_id=payload.get("device_id") or payload.get("device") or "esp32-01",
             timestamp=parse_timestamp(payload.get("timestamp")),
-            current=payload.get("current") if payload.get("current") is not None else payload.get("i_rms"),
-            voltage=payload.get("voltage") if payload.get("voltage") is not None else payload.get("voltage_rms"),
-            power=payload.get("power") if payload.get("power") is not None else payload.get("s_est_va"),
+            current=(payload.get("current") if payload.get("current") is not None
+                     else payload.get("current_rms") if payload.get("current_rms") is not None
+            else payload.get("i_rms")),
+            voltage=(payload.get("voltage") if payload.get("voltage") is not None
+                     else payload.get("voltage_rms") if payload.get("voltage_rms") is not None
+            else payload.get("v_rms")),
+            power=(payload.get("power") if payload.get("power") is not None
+                   else payload.get("apparent_power") if payload.get("apparent_power") is not None
+            else payload.get("s_est_va")),
             channel=payload.get("channel") or payload.get("channel_current")
         )
 
-        print(f"[MQTT] Parsed measurement: {measurement}")
 
         db = SessionLocal()
         try:
             saved = create_measurement(db, measurement)
-            print(f"[MQTT] Measurement saved to DB: id={saved.id}, device_ref_id={saved.device_ref_id}")
+            logger.info("[MQTT] Measurement saved id=%s", saved.id)
         finally:
             db.close()
 
     except Exception as e:
-        print(f"[MQTT] Error processing message: {e}")
+        logger.exception("[MQTT] Error processing message: %s", e)
 
 def start_mqtt_listener():
+    global mqtt_status
     client = mqtt.Client(client_id=MQTT_CLIENT_ID)
     client.on_connect = on_connect
+    client.on_disconnect = on_disconnect
     client.on_message = on_message
+    client.reconnect_delay_set(min_delay=1, max_delay=30)
 
-    print(f"[MQTT] Connecting to {MQTT_BROKER}:{MQTT_PORT}")
-    client.connect(MQTT_BROKER, MQTT_PORT, 60)
-    client.loop_start()
+    logger.info("[MQTT] Connecting to %s:%s", MQTT_BROKER, MQTT_PORT)
+    try:
+        client.connect(MQTT_BROKER, MQTT_PORT, 60)
+        client.loop_start()
+    except Exception as e:
+        mqtt_status = "offline"
+        logger.warning("[MQTT] Broker unavailable at startup (%s). Running in degraded mode.", e)
 
     return client
+

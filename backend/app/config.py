@@ -8,7 +8,7 @@ DATABASE_URL = f"sqlite:///{DATA_DIR / 'nilm.db'}"
 
 MQTT_BROKER = "127.0.0.1"
 MQTT_PORT = 1883
-MQTT_TOPIC_MEASUREMENTS = "nilm/esp32-01/telemetry"
+MQTT_TOPIC_MEASUREMENTS = "nilm/esp32-01/measurements"
 MQTT_CLIENT_ID = "nilm_backend_listener"
 
 JWT_SECRET_KEY = "change_this_to_a_long_random_secret"

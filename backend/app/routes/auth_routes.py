@@ -18,18 +18,21 @@ def register(user: schemas.UserCreate, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="Username already taken")
 
     password_hash = hash_password(user.password)
+
     new_user = crud.create_user(
         db,
         email=user.email,
         username=user.username,
         password_hash=password_hash
     )
+
     return new_user
 
 
 @router.post("/login", response_model=schemas.Token)
 def login(user: schemas.UserLogin, db: Session = Depends(get_db)):
     db_user = crud.get_user_by_email(db, user.email)
+
     if not db_user or not verify_password(user.password, db_user.password_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -37,12 +40,17 @@ def login(user: schemas.UserLogin, db: Session = Depends(get_db)):
         )
 
     token = create_access_token(subject=db_user.email)
+
     return schemas.Token(access_token=token)
 
 
 @router.post("/login-form", response_model=schemas.Token)
-def login_form(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+def login_form(
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    db: Session = Depends(get_db)
+):
     db_user = crud.get_user_by_email(db, form_data.username)
+
     if not db_user or not verify_password(form_data.password, db_user.password_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -50,4 +58,5 @@ def login_form(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = D
         )
 
     token = create_access_token(subject=db_user.email)
+
     return schemas.Token(access_token=token)

@@ -2,9 +2,11 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
 
+from app.database import SessionLocal
 from app.init_db import init_db
-from app.mqtt_listener import start_mqtt_listener
+from app.mqtt_listener import start_mqtt_listener, get_mqtt_status
 from app.routes.auth_routes import router as auth_router
 from app.routes.measurement_routes import router as measurement_router
 from app.routes.device_routes import router as device_router
@@ -50,3 +52,19 @@ app.include_router(stats_router)
 @app.get("/")
 def root():
     return {"message": "NILM backend is running"}
+
+
+@app.get("/health")
+def health():
+    db_status = "ok"
+    db = SessionLocal()
+    try:
+        db.execute(text("SELECT 1"))
+    finally:
+        db.close()
+
+    return {
+        "status": "ok",
+        "mqtt": get_mqtt_status(),
+        "database": db_status,
+    }

@@ -22,25 +22,31 @@ void Connectivity::setupMQTT() {
 
 bool Connectivity::connectWiFi(unsigned long timeout_ms) {
   Serial.println("[BOOT] WiFi connect...");
+  Serial.print("[WIFI] SSID: ");
+  Serial.println(WIFI_SSID);
 
-  WiFi.disconnect(true, true);
-  delay(300);
   WiFi.mode(WIFI_STA);
+  WiFi.disconnect(true, true);
+  delay(1000);
+
   WiFi.begin(WIFI_SSID, WIFI_PASS);
 
   unsigned long t0 = millis();
   while (WiFi.status() != WL_CONNECTED && (millis() - t0) < timeout_ms) {
     Serial.print(".");
-    delay(250);
+    delay(500);
   }
 
+  Serial.println();
+
   if (WiFi.status() == WL_CONNECTED) {
-    Serial.print("\n[OK] WiFi connected, IP = ");
+    Serial.println("[OK] WiFi connected");
+    Serial.print("[WIFI] IP: ");
     Serial.println(WiFi.localIP());
     return true;
   }
 
-  Serial.print("\n[ERR] WiFi failed, status = ");
+  Serial.print("[ERR] WiFi failed, status = ");
   Serial.println(WiFi.status());
   return false;
 }
@@ -75,9 +81,8 @@ void Connectivity::loop() {
     if (now - _lastWiFiRetry >= 10000) {
       _lastWiFiRetry = now;
       Serial.println("[WIFI] Reconnect...");
-      WiFi.disconnect(true, true);
+      WiFi.disconnect(false, false);
       delay(200);
-      WiFi.mode(WIFI_STA);
       WiFi.begin(WIFI_SSID, WIFI_PASS);
     }
     return;
@@ -99,6 +104,12 @@ void Connectivity::syncTime() {
     tries++;
   }
   Serial.println();
+
+  if (getLocalTime(&ti)) {
+    Serial.println("[OK] NTP synced");
+  } else {
+    Serial.println("[WARN] NTP sync failed");
+  }
 }
 
 bool Connectivity::isWiFiConnected() const {
@@ -118,13 +129,20 @@ String Connectivity::iso8601() {
   return String(buf);
 }
 
-bbool Connectivity::publishTelemetry(float iRms, float vRms, float sEstVA) {
-  if (!isWiFiConnected() || !isMQTTConnected()) {
+bool Connectivity::publishTelemetry(float iRms, float vRms, float power) {
+  if (!isWiFiConnected()) {
+    Serial.println("[PUB] skip: WiFi not connected");
+    return false;
+  }
+
+  if (!isMQTTConnected()) {
+    Serial.println("[PUB] skip: MQTT not connected");
     return false;
   }
 
   StaticJsonDocument<256> doc;
-  doc["device"] = DEVICE_ID;
+
+  doc["device_id"] = DEVICE_ID;
 
   String ts = iso8601();
   if (ts.length() > 0) {
@@ -132,23 +150,25 @@ bbool Connectivity::publishTelemetry(float iRms, float vRms, float sEstVA) {
   }
 
   doc["i_rms"] = roundf(iRms * 1000.0f) / 1000.0f;
-  doc["voltage_rms"] = roundf(vRms * 100.0f) / 100.0f;
+  doc["v_rms"] = roundf(vRms * 100.0f) / 100.0f;
   doc["s_est_va"] = roundf(sEstVA * 10.0f) / 10.0f;
-  doc["adc_sample_sps"] = ADS_SPS;
-  doc["channel_current"] = "AIN0-AIN1";
-  doc["channel_voltage"] = "TBD";
-  doc["note"] = "current + voltage telemetry";
+  doc["sample_rate"] = ADS_SPS;
+  doc["source"] = "esp32_ads1256";
 
   char payload[256];
-  serializeJson(doc, payload);
+  serializeJson(doc, payload, sizeof(payload));
 
-  Serial.print("[PUB] ");
+  Serial.print("[PUB] topic = ");
+  Serial.println(MQTT_TOPIC);
+  Serial.print("[PUB] payload = ");
   Serial.println(payload);
 
-  bool ok = _mqtt.publish(MQTT_TOPIC, payload);
+  bool ok = _mqtt.publish(MQTT_TOPIC, payload, n);
   if (!ok) {
     Serial.println("[MQTT] publish failed");
+  } else {
+    Serial.println("[MQTT] publish OK");
   }
 
   return ok;
-}}
+}

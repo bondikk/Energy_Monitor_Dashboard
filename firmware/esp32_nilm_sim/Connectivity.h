@@ -13,10 +13,10 @@ public:
   void syncTime();
 
   bool isWiFiConnected() const;
-  bool isMQTTConnected() ;
+  bool isMQTTConnected();
 
   String iso8601();
-  bool publishTelemetry(float iRms, float vRms, float sEstVA);
+  bool publishTelemetry(float iRms, float vRms, float power);
 
 private:
   WiFiClient _espClient;
