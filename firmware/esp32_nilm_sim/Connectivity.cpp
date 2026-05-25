@@ -151,9 +151,12 @@ bool Connectivity::publishTelemetry(float iRms, float vRms, float power) {
 
   doc["i_rms"] = roundf(iRms * 1000.0f) / 1000.0f;
   doc["v_rms"] = roundf(vRms * 100.0f) / 100.0f;
-  doc["s_est_va"] = roundf(sEstVA * 10.0f) / 10.0f;
+
+// Estimated apparent power only: S_est = V_rms * I_rms or V_nominal * I_rms.
+  doc["s_est_va"] = roundf(power * 10.0f) / 10.0f;
+
   doc["sample_rate"] = ADS_SPS;
-  doc["source"] = "esp32_ads1256";
+doc["source"] = "esp32_ads1256";
 
   char payload[256];
   serializeJson(doc, payload, sizeof(payload));
@@ -163,7 +166,7 @@ bool Connectivity::publishTelemetry(float iRms, float vRms, float power) {
   Serial.print("[PUB] payload = ");
   Serial.println(payload);
 
-  bool ok = _mqtt.publish(MQTT_TOPIC, payload, n);
+  bool ok = _mqtt.publish(MQTT_TOPIC, payload);
   if (!ok) {
     Serial.println("[MQTT] publish failed");
   } else {

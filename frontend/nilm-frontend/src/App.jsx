@@ -148,29 +148,63 @@ export default function App() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
 
+  const [activeTab, setActiveTab] = useState("dashboard");
   const [historyLimit, setHistoryLimit] = useState(50);
   const [chartMetric, setChartMetric] = useState("power");
   const [backendOnline, setBackendOnline] = useState(false);
   const [lastUpdate, setLastUpdate] = useState("");
+  const [health, setHealth] = useState({ status: "unknown", mqtt: "unknown", database: "unknown" });
+  const [selectedRange, setSelectedRange] = useState("~2m");
+
+  const rangeOptions = {
+    "~2m": 120,
+    "~5m": 300,
+    "~15m": 500,
+  };
+
+  function getFreshnessLabel(timestamp) {
+    if (!timestamp) return "No data yet";
+    const measuredAt = new Date(timestamp);
+    if (Number.isNaN(measuredAt.getTime())) return "Timestamp format unknown";
+
+    const ageSec = Math.max(0, Math.floor((Date.now() - measuredAt.getTime()) / 1000));
+    if (ageSec < 10) return "Fresh (<10s)";
+    if (ageSec < 60) return `Fresh (${ageSec}s ago)`;
+    const ageMin = Math.floor(ageSec / 60);
+    if (ageMin < 60) return `Delayed (${ageMin}m ago)`;
+    return `Stale (${Math.floor(ageMin / 60)}h ago)`;
+  }
 
   async function load() {
     try {
-      const latestRes = await fetch(`${API_BASE}/measurements/latest`);
+      const [latestRes, historyRes, healthRes] = await Promise.all([
+        fetch(`${API_BASE}/measurements/latest`),
+        fetch(`${API_BASE}/measurements/history?limit=${historyLimit}`),
+        fetch(`${API_BASE}/health`),
+      ]);
       if (!latestRes.ok) {
         throw new Error(`Latest API error: ${latestRes.status}`);
       }
-      const latest = await latestRes.json();
 
-      const historyRes = await fetch(
-        `${API_BASE}/measurements/history?limit=${historyLimit}`
-      );
       if (!historyRes.ok) {
         throw new Error(`History API error: ${historyRes.status}`);
       }
+
+      if (!healthRes.ok) {
+        throw new Error(`Health API error: ${healthRes.status}`);
+      }
+
+      const latest = await latestRes.json();
       const historyJson = await historyRes.json();
+      const healthJson = await healthRes.json();
 
       setData(latest);
       setHistory(historyJson.items ?? []);
+      setHealth({
+        status: healthJson.status ?? "unknown",
+        mqtt: healthJson.mqtt ?? "unknown",
+        database: healthJson.database ?? "unknown",
+      });
       setBackendOnline(true);
       setLastUpdate(new Date().toLocaleTimeString());
       setError("");
@@ -189,6 +223,10 @@ export default function App() {
     const id = setInterval(load, 2000);
     return () => clearInterval(id);
   }, [historyLimit, isAuthenticated]);
+
+  useEffect(() => {
+    setHistoryLimit(rangeOptions[selectedRange]);
+  }, [selectedRange]);
 
   const chartData = useMemo(() => {
     return [...history].reverse().map((item) => ({
@@ -310,6 +348,27 @@ export default function App() {
           </button>
         </div>
 
+        <div style={{ marginTop: 18, display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <button
+            onClick={() => setActiveTab("dashboard")}
+            style={buttonStyle(activeTab === "dashboard")}
+          >
+            Dashboard
+          </button>
+          <button
+            onClick={() => setActiveTab("theory")}
+            style={buttonStyle(activeTab === "theory")}
+          >
+            Theory
+          </button>
+          <button
+            onClick={() => setActiveTab("diagnostics")}
+            style={buttonStyle(activeTab === "diagnostics")}
+          >
+            Diagnostics
+          </button>
+        </div>
+
         <div
           style={{
             marginTop: 18,
@@ -345,7 +404,8 @@ export default function App() {
             Last update: {lastUpdate || "-"}
           </div>
         </div>
-
+        {activeTab === "dashboard" && (
+          <>
         {loading && <p style={{ marginTop: 16 }}>Загрузка...</p>}
 
         {error && (
@@ -442,6 +502,9 @@ export default function App() {
             <h2 style={{ margin: 0, color: "#111827" }}>History Chart</h2>
 
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                <button onClick={() => setSelectedRange("~2m")} style={smallButtonStyle(selectedRange === "~2m")}>~2 min</button>
+              <button onClick={() => setSelectedRange("~5m")} style={smallButtonStyle(selectedRange === "~5m")}>~5 min</button>
+              <button onClick={() => setSelectedRange("~15m")} style={smallButtonStyle(selectedRange === "~15m")}>~15 min</button>
               <button
                 onClick={() => setChartMetric("power")}
                 style={buttonStyle(chartMetric === "power")}
@@ -577,6 +640,36 @@ export default function App() {
             </div>
           )}
         </div>
+          </>
+        )}
+
+        {activeTab === "theory" && (
+          <div style={{ marginTop: 28, background: "#ffffff", border: "1px solid #e5e7eb", borderRadius: 16, padding: 24, boxShadow: "0 4px 16px rgba(0,0,0,0.05)", lineHeight: 1.6 }}>
+            <h2 style={{ marginTop: 0, color: "#111827" }}>How this NILM demo works</h2>
+            <p><strong>Pipeline:</strong> ESP32 reads electrical signals, publishes telemetry to MQTT, backend stores measurements in SQLite, and this UI polls backend API.</p>
+            <h3>Why RMS current and RMS voltage?</h3>
+            <p>AC waveforms change over time. RMS gives a stable effective value, so current and voltage can be compared over time.</p>
+            <h3>Why apparent power = V × I?</h3>
+            <p>This project currently estimates apparent power as RMS voltage times RMS current. It is useful for trend monitoring, though not full active power analysis.</p>
+            <h3>Current limitations</h3>
+            <ul>
+              <li>No appliance disaggregation model yet (this is telemetry-first).</li>
+              <li>Voltage sensor can fall back to a configured nominal mains voltage in firmware.</li>
+              <li>History endpoint is count-based, so chart ranges are approximate windows.</li>
+            </ul>
+          </div>
+        )}
+
+        {activeTab === "diagnostics" && (
+          <div style={{ marginTop: 28, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 16 }}>
+            <MetricCard title="Backend status" value={backendOnline ? "Online" : "Offline"} unit="" />
+            <MetricCard title="API health" value={health.status} unit="" />
+            <MetricCard title="MQTT" value={health.mqtt} unit="" />
+            <MetricCard title="Database" value={health.database} unit="" />
+            <MetricCard title="Data freshness" value={getFreshnessLabel(data?.timestamp)} unit="" />
+            <MetricCard title="Last UI update" value={lastUpdate || "-"} unit="" />
+          </div>
+        )}
       </div>
     </div>
   );

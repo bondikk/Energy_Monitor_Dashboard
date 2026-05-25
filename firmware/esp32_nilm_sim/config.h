@@ -10,7 +10,7 @@
 static const int PIN_ADS_SCK  = 18;
 static const int PIN_ADS_MOSI = 23;
 static const int PIN_ADS_MISO = 19;
-static const int PIN_ADS_CS   = 21;   
+static const int PIN_ADS_CS   = 5;
 static const int PIN_ADS_DRDY = 4;
 static const int PIN_ADS_PDWN = -1;
 
