@@ -26,8 +26,10 @@ bool Connectivity::connectWiFi(unsigned long timeout_ms) {
   Serial.println(WIFI_SSID);
 
   WiFi.mode(WIFI_STA);
-  WiFi.disconnect(true, true);
-  delay(1000);
+  if (WiFi.status() == WL_CONNECTED) {
+    WiFi.disconnect(false, false);
+    delay(200);
+  }
 
   WiFi.begin(WIFI_SSID, WIFI_PASS);
 
@@ -81,9 +83,15 @@ void Connectivity::loop() {
     if (now - _lastWiFiRetry >= 10000) {
       _lastWiFiRetry = now;
       Serial.println("[WIFI] Reconnect...");
-      WiFi.disconnect(false, false);
-      delay(200);
-      WiFi.begin(WIFI_SSID, WIFI_PASS);
+      if (WiFi.getMode() != WIFI_STA) {
+        WiFi.mode(WIFI_STA);
+      }
+      wl_status_t st = WiFi.status();
+      if (st == WL_NO_SHIELD || st == WL_STOPPED || st == WL_IDLE_STATUS) {
+        WiFi.begin(WIFI_SSID, WIFI_PASS);
+      } else {
+        WiFi.reconnect();
+      }
     }
     return;
   }

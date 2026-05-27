@@ -22,12 +22,29 @@
 
 ADS1256Driver::ADS1256Driver()
   : _spi(VSPI),
-    _isInitialized(false) {
+    _isInitialized(false),
+    _drdyTimeoutStreak(0),
+    _lastInitFailReason(INIT_OK) {
 }
+
 
 bool ADS1256Driver::isAvailable() const {
   return _isInitialized;
 }
+
+ADS1256Driver::InitFailReason ADS1256Driver::getLastInitFailReason() const {
+  return _lastInitFailReason;
+}
+
+const char* ADS1256Driver::getLastInitFailReasonStr() const {
+  switch (_lastInitFailReason) {
+    case INIT_OK: return "ok";
+    case FAIL_DRDY_BEFORE_INIT: return "DRDY timeout before init";
+    case FAIL_DRDY_SELFCAL: return "DRDY timeout during SELFCAL";
+    case FAIL_REGS_ALL_FF: return "invalid register readback (all 0xFF)";
+    case FAIL_DRATE_MISMATCH: return "DRATE readback mismatch";
+    default: return "unknown";
+  }
 
 void ADS1256Driver::chipSelect(bool en) {
   digitalWrite(PIN_ADS_CS, en ? LOW : HIGH);
@@ -57,7 +74,7 @@ void ADS1256Driver::writeRegister(uint8_t reg, uint8_t value) {
   }
   chipSelect(true);
   _spi.transfer(ADS_CMD_WREG | reg);
-  _spi.transfer(0x00);   // write 1 register
+  _spi.transfer(0x00);   
   _spi.transfer(value);
   chipSelect(false);
   delayMicroseconds(10);
@@ -93,8 +110,14 @@ int32_t ADS1256Driver::readRaw() {
 
   if (!waitDRDY(1000)) {
     Serial.println("[ADS1256] DRDY timeout during readRaw");
+    _drdyTimeoutStreak++;
+    if (_drdyTimeoutStreak >= 5) {
+      Serial.println("[ADS1256] too many DRDY timeouts, disabling ADC until re-init");
+      _isInitialized = false;
+    }
     return 0;
   }
+  _drdyTimeoutStreak = 0;
 
   chipSelect(true);
   _spi.transfer(ADS_CMD_RDATA);
@@ -117,6 +140,8 @@ int32_t ADS1256Driver::readRaw() {
 
 bool ADS1256Driver::begin() {
   _isInitialized = false;
+  _drdyTimeoutStreak = 0;
+  _lastInitFailReason = INIT_OK;
 
   Serial.println("[ADS1256] begin: configure GPIO");
   pinMode(PIN_ADS_CS, OUTPUT);
@@ -181,10 +206,28 @@ Serial.println("[ADS1256] begin: start VSPI");
   uint8_t adcon  = readRegister(ADS_REG_ADCON);
   uint8_t drate  = readRegister(ADS_REG_DRATE);
 
-   Serial.println("[ADS1256] init done");
+  Serial.println("[ADS1256] init done");
   Serial.print("[ADS1256] STATUS=0x"); Serial.println(status, HEX);
   Serial.print("[ADS1256] MUX   =0x"); Serial.println(mux, HEX);
   Serial.print("[ADS1256] ADCON =0x"); Serial.println(adcon, HEX);
   Serial.print("[ADS1256] DRATE =0x"); Serial.println(drate, HEX);
+
+  // Floating SPI or missing device often reads 0xFF for every register.
+  // Treat this as "ADC unavailable" so upper layers fail gracefully.
+  if (status == 0xFF && mux == 0xFF && adcon == 0xFF && drate == 0xFF) {
+    _lastInitFailReason = FAIL_REGS_ALL_FF;
+    Serial.println("[ADS1256] invalid register readback (all 0xFF), ADC not detected");
+    _isInitialized = false;
+    return false;
+  }
+
+  if (drate != 0xA1) {
+    _lastInitFailReason = FAIL_DRATE_MISMATCH;
+    Serial.println("[ADS1256] DRATE readback mismatch, ADC init failed");
+    _isInitialized = false;
+    return false;
+  }
+
+  _lastInitFailReason = INIT_OK;
   return true;
 }

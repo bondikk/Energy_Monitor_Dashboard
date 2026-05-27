@@ -4,10 +4,20 @@
 
 class ADS1256Driver {
 public:
+enum InitFailReason : uint8_t {
+    INIT_OK = 0,
+    FAIL_DRDY_BEFORE_INIT,
+    FAIL_DRDY_SELFCAL,
+    FAIL_REGS_ALL_FF,
+    FAIL_DRATE_MISMATCH
+  };
+
   ADS1256Driver();
 
   bool begin();
-  bool isAvailable() const;
+bool isAvailable() const;
+  InitFailReason getLastInitFailReason() const;
+  const char* getLastInitFailReasonStr() const;
 
   void setChannelAIN0AIN1();
   int32_t readRaw();
@@ -18,6 +28,8 @@ public:
 private:
   SPIClass _spi;
   bool _isInitialized;
+  uint8_t _drdyTimeoutStreak;
+  InitFailReason _lastInitFailReason;
 
   void chipSelect(bool en);
   void sendCommand(uint8_t cmd);

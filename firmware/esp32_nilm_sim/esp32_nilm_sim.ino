@@ -13,14 +13,20 @@ VoltageSensor voltageSensor(adc);   // пока не используется
 Connectivity conn;
 
 static bool gAdsReady = false;
+static unsigned long gLastAdsInitAttemptMs = 0;
+
+static const unsigned long ADS_REINIT_INTERVAL_MS = 15000;
+static const unsigned long ADS_UNAVAILABLE_LOG_INTERVAL_MS = 10000;
 
 static void initAdsSafely() {
+  gLastAdsInitAttemptMs = millis();
   Serial.println("[ADS1256] begin safe initialization");
   gAdsReady = adc.begin();
   if (!gAdsReady) {
-    Serial.println("[ADS1256] not responding / DRDY timeout (running without ADC)");
+    Serial.print("[ADS1256] init failed: ");
+    Serial.println(adc.getLastInitFailReasonStr());
+    Serial.println("[ADS1256] running without ADC");
     return;
-  }
 
   currentSensor.begin();
   voltageSensor.begin();
@@ -57,6 +63,11 @@ void loop() {
 
   conn.loop();
 
+  if (!gAdsReady && (now - gLastAdsInitAttemptMs >= ADS_REINIT_INTERVAL_MS)) {
+    Serial.println("[ADS1256] periodic re-init attempt...");
+    initAdsSafely();
+  }
+
   if (now - tPub >= 1000) {
     tPub = now;
 
@@ -64,9 +75,14 @@ void loop() {
     if (gAdsReady) {
       i_rms = currentSensor.readCurrentRMS(RMS_SAMPLES);
     } else {
-      Serial.println("[ADS1256] skipped sampling: ADC unavailable");
+      static unsigned long tAdsUnavailableLog = 0;
+      if (now - tAdsUnavailableLog >= ADS_UNAVAILABLE_LOG_INTERVAL_MS) {
+        tAdsUnavailableLog = now;
+        Serial.print("[ADS1256] skipped sampling: ADC unavailable (reason: ");
+        Serial.print(adc.getLastInitFailReasonStr());
+        Serial.println(")");
+      }
     }
-
     float v_rms = voltageSensor.readVoltageRMS(RMS_SAMPLES);
     if (v_rms <= 1.0f) {
       v_rms = MAINS_V_RMS_EST;   // временный fallback, пока VoltageSensor = заглушка
