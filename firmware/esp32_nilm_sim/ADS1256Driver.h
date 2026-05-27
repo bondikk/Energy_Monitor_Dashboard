@@ -7,6 +7,7 @@ public:
   ADS1256Driver();
 
   bool begin();
+  bool isAvailable() const;
 
   void setChannelAIN0AIN1();
   int32_t readRaw();
@@ -16,6 +17,7 @@ public:
 
 private:
   SPIClass _spi;
+  bool _isInitialized;
 
   void chipSelect(bool en);
   void sendCommand(uint8_t cmd);

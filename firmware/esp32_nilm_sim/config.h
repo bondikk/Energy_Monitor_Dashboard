@@ -2,18 +2,14 @@
 #include <Arduino.h>
 
 // =========================
-// ADS1256 pins
-// Thesis wiring default:
-// SCLK=18, MOSI=23, MISO=19, CS=5, DRDY=4,
-// PDWN physically tied to 3.3V (not GPIO-controlled)
-// =========================
 static const int PIN_ADS_SCK  = 18;
 static const int PIN_ADS_MOSI = 23;
 static const int PIN_ADS_MISO = 19;
-static const int PIN_ADS_CS   = 5;
-static const int PIN_ADS_DRDY = 4;
+static const int PIN_ADS_CS   = 25;
+static const int PIN_ADS_DRDY = 26;
 static const int PIN_ADS_PDWN = -1;
 
+static const bool ADS_INIT_AFTER_NETWORK = true;
 // =========================
 // Measurement settings
 // =========================

@@ -21,7 +21,12 @@
 #define ADS_REG_DRATE    0x03
 
 ADS1256Driver::ADS1256Driver()
-  : _spi(VSPI) {
+  : _spi(VSPI),
+    _isInitialized(false) {
+}
+
+bool ADS1256Driver::isAvailable() const {
+  return _isInitialized;
 }
 
 void ADS1256Driver::chipSelect(bool en) {
@@ -36,14 +41,20 @@ void ADS1256Driver::sendCommand(uint8_t cmd) {
 }
 
 bool ADS1256Driver::waitDRDY(uint32_t timeout_ms) {
-  uint32_t t0 = millis();
+  const uint32_t t0 = millis();
   while (digitalRead(PIN_ADS_DRDY) == HIGH) {
-    if ((millis() - t0) > timeout_ms) return false;
+   if ((millis() - t0) > timeout_ms) {
+      return false;
+    }
+    delay(1);
   }
   return true;
 }
 
 void ADS1256Driver::writeRegister(uint8_t reg, uint8_t value) {
+  if (!_isInitialized) {
+    return;
+  }
   chipSelect(true);
   _spi.transfer(ADS_CMD_WREG | reg);
   _spi.transfer(0x00);   // write 1 register
@@ -53,6 +64,9 @@ void ADS1256Driver::writeRegister(uint8_t reg, uint8_t value) {
 }
 
 uint8_t ADS1256Driver::readRegister(uint8_t reg) {
+  if (!_isInitialized) {
+    return 0xFF;
+  }
   chipSelect(true);
   _spi.transfer(ADS_CMD_RREG | reg);
   _spi.transfer(0x00);   // read 1 register
@@ -63,14 +77,22 @@ uint8_t ADS1256Driver::readRegister(uint8_t reg) {
 }
 
 void ADS1256Driver::setChannelAIN0AIN1() {
+  if (!_isInitialized) {
+    return;
+  }
+
   // POS = AIN0, NEG = AIN1
   writeRegister(ADS_REG_MUX, 0x01);
   delayMicroseconds(10);
 }
 
 int32_t ADS1256Driver::readRaw() {
-  if (!waitDRDY()) {
-    Serial.println("[ADS] DRDY timeout");
+  if (!_isInitialized) {
+    return 0;
+  }
+
+  if (!waitDRDY(1000)) {
+    Serial.println("[ADS1256] DRDY timeout during readRaw");
     return 0;
   }
 
@@ -94,10 +116,14 @@ int32_t ADS1256Driver::readRaw() {
 }
 
 bool ADS1256Driver::begin() {
+  _isInitialized = false;
+
+  Serial.println("[ADS1256] begin: configure GPIO");
   pinMode(PIN_ADS_CS, OUTPUT);
   digitalWrite(PIN_ADS_CS, HIGH);
 
-  pinMode(PIN_ADS_DRDY, INPUT);
+  pinMode(PIN_ADS_DRDY, INPUT_PULLUP);
+
 
   if (PIN_ADS_PDWN >= 0) {
     pinMode(PIN_ADS_PDWN, OUTPUT);
@@ -105,6 +131,7 @@ bool ADS1256Driver::begin() {
     delay(10);
   }
 
+Serial.println("[ADS1256] begin: start VSPI");
   _spi.begin(
     PIN_ADS_SCK,
     PIN_ADS_MISO,
@@ -112,9 +139,16 @@ bool ADS1256Driver::begin() {
     PIN_ADS_CS
   );
 
+ Serial.println("[ADS1256] begin: wait DRDY ready");
+  if (!waitDRDY(500)) {
+    Serial.println("[ADS1256] not responding / DRDY timeout before init");
+    return false;
+  }
+
+  Serial.println("[ADS1256] begin: send SDATAC");
   sendCommand(ADS_CMD_SDATAC);
   delay(5);
-
+ _isInitialized = true;
   // STATUS: MSB first, ACAL off, buffer off
   writeRegister(ADS_REG_STATUS, 0x00);
 
@@ -130,9 +164,11 @@ bool ADS1256Driver::begin() {
   delay(5);
 
   // self calibration
+  Serial.println("[ADS1256] begin: SELFCAL");
   sendCommand(ADS_CMD_SELFCAL);
   if (!waitDRDY(2000)) {
-    Serial.println("[ADS] SELFCAL timeout");
+    Serial.println("[ADS1256] not responding / DRDY timeout during SELFCAL");
+    _isInitialized = false;
     return false;
   }
 
@@ -145,11 +181,10 @@ bool ADS1256Driver::begin() {
   uint8_t adcon  = readRegister(ADS_REG_ADCON);
   uint8_t drate  = readRegister(ADS_REG_DRATE);
 
-  Serial.println("[ADS] Init done");
-  Serial.print("[ADS] STATUS=0x"); Serial.println(status, HEX);
-  Serial.print("[ADS] MUX   =0x"); Serial.println(mux, HEX);
-  Serial.print("[ADS] ADCON =0x"); Serial.println(adcon, HEX);
-  Serial.print("[ADS] DRATE =0x"); Serial.println(drate, HEX);
-
+   Serial.println("[ADS1256] init done");
+  Serial.print("[ADS1256] STATUS=0x"); Serial.println(status, HEX);
+  Serial.print("[ADS1256] MUX   =0x"); Serial.println(mux, HEX);
+  Serial.print("[ADS1256] ADCON =0x"); Serial.println(adcon, HEX);
+  Serial.print("[ADS1256] DRATE =0x"); Serial.println(drate, HEX);
   return true;
 }
