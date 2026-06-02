@@ -5,11 +5,11 @@
 static const int PIN_ADS_SCK  = 18;
 static const int PIN_ADS_MOSI = 23;
 static const int PIN_ADS_MISO = 19;
-static const int PIN_ADS_CS   = 25;
-static const int PIN_ADS_DRDY = 26;
-static const int PIN_ADS_PDWN = -1;
+static const int PIN_ADS_CS   = 5;
+static const int PIN_ADS_DRDY = 34;
+static const int PIN_ADS_PDWN = 27;
 
-static const bool ADS_INIT_AFTER_NETWORK = true;
+static const bool ADS_INIT_AFTER_NETWORK = false;
 // =========================
 // Measurement settings
 // =========================

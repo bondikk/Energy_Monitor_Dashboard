@@ -179,7 +179,7 @@ bool ADS1256Driver::begin() {
   pinMode(PIN_ADS_CS, OUTPUT);
   digitalWrite(PIN_ADS_CS, HIGH);
 
-  pinMode(PIN_ADS_DRDY, INPUT_PULLUP);
+ pinMode(PIN_ADS_DRDY, INPUT);
 
 
   if (PIN_ADS_PDWN >= 0) {
@@ -202,12 +202,11 @@ Serial.print(" PDWN="); Serial.println(PIN_ADS_PDWN);
     PIN_ADS_CS
   );
 
-Serial.print("[ADS1256][diag] DRDY level before wait=");
+Serial.println("[ADS1256] begin: wait DRDY ready");
   Serial.println(digitalRead(PIN_ADS_DRDY));
   if (!waitDRDY(500)) {
      _lastInitFailReason = FAIL_DRDY_BEFORE_INIT;
-    Serial.println("[ADS1256] not responding / DRDY timeout before init");
-    return false;
+     Serial.println("[ADS1256] DRDY not low before init, continuing with ADS1256 config");
   }
 
   Serial.println("[ADS1256] begin: send SDATAC");
