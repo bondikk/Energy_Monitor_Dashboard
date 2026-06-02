@@ -23,6 +23,7 @@ bool isAvailable() const;
   int32_t readRaw();
 
   uint8_t readRegister(uint8_t reg);
+  uint8_t readRegisterWithRetry(uint8_t reg, uint8_t attempts = 3);
   void writeRegister(uint8_t reg, uint8_t value);
 
 private:

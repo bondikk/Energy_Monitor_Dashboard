@@ -21,13 +21,26 @@ static const unsigned long ADS_UNAVAILABLE_LOG_INTERVAL_MS = 10000;
 static void initAdsSafely() {
   gLastAdsInitAttemptMs = millis();
   Serial.println("[ADS1256] begin safe initialization");
+  Serial.print("[ADS1256][diag] fail reason before begin: ");
+  Serial.print(adc.getLastInitFailReasonStr());
+  Serial.print(" (code=");
+  Serial.print(static_cast<uint8_t>(adc.getLastInitFailReason()));
+  Serial.println(")");
+  
   gAdsReady = adc.begin();
+
+  Serial.print("[ADS1256][diag] fail reason after begin: ");
+  Serial.print(adc.getLastInitFailReasonStr());
+  Serial.print(" (code=");
+  Serial.print(static_cast<uint8_t>(adc.getLastInitFailReason()));
+  Serial.println(")");
+
   if (!gAdsReady) {
     Serial.print("[ADS1256] init failed: ");
     Serial.println(adc.getLastInitFailReasonStr());
     Serial.println("[ADS1256] running without ADC");
     return;
-
+  }
   currentSensor.begin();
   voltageSensor.begin();
   Serial.println("[ADS1256] initialization successful");
