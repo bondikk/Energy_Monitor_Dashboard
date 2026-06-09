@@ -42,7 +42,6 @@ export default function AuthPage({ onLoginSuccess }) {
     try {
       const data = await loginUser(loginForm);
 
-      // Ожидаем access_token, но поддержим несколько вариантов
       const token =
         data?.access_token ||
         data?.token ||

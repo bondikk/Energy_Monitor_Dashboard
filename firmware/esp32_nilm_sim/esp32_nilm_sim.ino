@@ -9,7 +9,7 @@
 
 ADS1256Driver adc;
 CurrentSensor currentSensor(adc);
-VoltageSensor voltageSensor(adc);   // пока не используется
+VoltageSensor voltageSensor(adc);
 Connectivity conn;
 
 static bool gAdsReady = false;
@@ -98,7 +98,7 @@ void loop() {
     }
     float v_rms = voltageSensor.readVoltageRMS(RMS_SAMPLES);
     if (v_rms <= 1.0f) {
-      v_rms = MAINS_V_RMS_EST;   // временный fallback, пока VoltageSensor = заглушка
+      v_rms = MAINS_V_RMS_EST;
     }
 
     const float s_est = PowerMetrics::apparentPower(v_rms, i_rms);

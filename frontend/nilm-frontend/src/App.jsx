@@ -406,7 +406,7 @@ export default function App() {
         </div>
         {activeTab === "dashboard" && (
           <>
-        {loading && <p style={{ marginTop: 16 }}>Загрузка...</p>}
+        {loading && <p style={{ marginTop: 16 }}>Loading...</p>}
 
         {error && (
           <div
@@ -543,7 +543,7 @@ export default function App() {
           </div>
 
           {chartData.length === 0 ? (
-            <p style={{ color: "#6b7280" }}>История пока пустая.</p>
+            <p style={{ color: "#6b7280" }}>History is empty.</p>
           ) : (
             <div style={{ width: "100%", height: 320 }}>
               <ResponsiveContainer>
@@ -602,7 +602,7 @@ export default function App() {
           </div>
 
           {history.length === 0 ? (
-            <p style={{ color: "#6b7280" }}>Нет данных истории.</p>
+            <p style={{ color: "#6b7280" }}>No history data.</p>
           ) : (
             <div style={{ overflowX: "auto" }}>
               <table

@@ -32,7 +32,7 @@ export default function Dashboard() {
       setData(result);
       setError("");
     } catch (e) {
-      setError("Не удалось получить данные с backend");
+      setError("Failed to load data from backend");
     } finally {
       setLoading(false);
     }
@@ -59,7 +59,7 @@ export default function Dashboard() {
           Live telemetry from ESP32 + ADS1256
         </p>
 
-        {loading && <p>Загрузка...</p>}
+        {loading && <p>Loading...</p>}
         {error && (
           <div
             style={{

@@ -30,5 +30,5 @@ Thumbs.db
 # --- Jupyter / notebooks ---
 .ipynb_checkpoints/
 
-# --- PlatformIO (если появится firmware часть) ---
+# --- PlatformIO ---
 firmware/.pio/

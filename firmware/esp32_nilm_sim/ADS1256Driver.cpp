@@ -1,9 +1,7 @@
 #include "ADS1256Driver.h"
 #include "config.h"
 
-// =========================
 // ADS1256 commands
-// =========================
 #define ADS_CMD_WAKEUP   0x00
 #define ADS_CMD_RDATA    0x01
 #define ADS_CMD_RDATAC   0x03
@@ -128,7 +126,6 @@ void ADS1256Driver::setChannelAIN0AIN1() {
     return;
   }
 
-  // POS = AIN0, NEG = AIN1
   writeRegister(ADS_REG_MUX, 0x01);
   delayMicroseconds(10);
 }
@@ -164,7 +161,7 @@ int32_t ADS1256Driver::readRaw() {
   int32_t value = ((int32_t)b0 << 16) | ((int32_t)b1 << 8) | b2;
 
   if (value & 0x800000) {
-    value |= 0xFF000000; // sign extension 24 -> 32
+    value |= 0xFF000000;
   }
 
   return value;
@@ -213,21 +210,17 @@ Serial.println("[ADS1256] begin: wait DRDY ready");
   sendCommand(ADS_CMD_SDATAC);
   delay(5);
  _isInitialized = true;
-  // STATUS: MSB first, ACAL off, buffer off
+
   writeRegister(ADS_REG_STATUS, 0x00);
 
-  // MUX: AIN0 - AIN1
   setChannelAIN0AIN1();
 
-  // ADCON: gain = 1
   writeRegister(ADS_REG_ADCON, 0x00);
 
-  // DRATE: ~1000 SPS
   writeRegister(ADS_REG_DRATE, 0xA1);
 
   delay(5);
 
-  // self calibration
   Serial.println("[ADS1256] begin: SELFCAL");
   sendCommand(ADS_CMD_SELFCAL);
   if (!waitDRDY(2000)) {
@@ -237,7 +230,6 @@ Serial.println("[ADS1256] begin: wait DRDY ready");
     return false;
   }
 
-  // set mux again after calibration
   setChannelAIN0AIN1();
   delayMicroseconds(20);
 
@@ -252,8 +244,6 @@ Serial.println("[ADS1256] begin: wait DRDY ready");
   Serial.print("[ADS1256] ADCON =0x"); Serial.println(adcon, HEX);
   Serial.print("[ADS1256] DRATE =0x"); Serial.println(drate, HEX);
 
-  // Floating SPI or missing device often reads 0xFF for every register.
-  // Treat this as "ADC unavailable" so upper layers fail gracefully.
   if (status == 0xFF && mux == 0xFF && adcon == 0xFF && drate == 0xFF) {
     _lastInitFailReason = FAIL_REGS_ALL_FF;
     Serial.println("[ADS1256] invalid register readback (all 0xFF), ADC not detected");
