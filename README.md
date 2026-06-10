@@ -111,7 +111,7 @@ The backend uses SQLite through Python, so no separate database server is requir
 Clone the repository before running the backend, frontend, or firmware code:
 
 ```bash
-git clone [https://github.com/bondikk/nilm_host.git](https://github.com/bondikk/Energy_Monitor_Dashboard.git)
+git clone https://github.com/bondikk/Energy_Monitor_Dashboard.git
 cd Energy_Monitor_Dashboard
 ```
 
