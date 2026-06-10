@@ -1,10 +1,12 @@
-# NILM Host
+# Energy Telemetry Frontend
 
 ## Overview
 
-NILM Host is a small local system for collecting and displaying electrical measurement data from an ESP32-based device. The project connects an ESP32 + ADS1256 firmware sketch, an MQTT broker, a FastAPI backend, a SQLite database, and a React dashboard.
+Energy Monitor Dashboard is a small local system for collecting and displaying electrical measurement data from an ESP32-based device. The project connects an ESP32 + ADS1256 firmware sketch, an MQTT broker, a FastAPI backend, a SQLite database, and a React dashboard.
 
 The current version is focused on telemetry collection and visualization. It does not perform appliance disaggregation yet, but it prepares the data flow that can be used later for NILM experiments.
+
+The name `Energy Monitor Dashboard` is used because the project currently works as a telemetry collection and dashboard hub. It is more accurate than `NILM Host`, since the application does not yet perform NILM appliance disaggregation.
 
 ## Project Parts
 
@@ -103,6 +105,15 @@ firmware/
 - Arduino IDE or PlatformIO for flashing the ESP32 firmware
 
 The backend uses SQLite through Python, so no separate database server is required.
+
+## Clone the Repository
+
+Clone the repository before running the backend, frontend, or firmware code:
+
+```bash
+git clone [https://github.com/bondikk/nilm_host.git](https://github.com/bondikk/Energy_Monitor_Dashboard.git)
+cd Energy_Monitor_Dashboard
+```
 
 ## Backend Setup
 
